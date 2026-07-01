@@ -177,12 +177,86 @@ with tab1:
 with tab2:
     st.header("Batch CSV Prediction")
 
-    st.info("""
-The deployed version focuses on single race-situation prediction.
-Batch CSV prediction can be added as a future extension.
+    st.markdown("""
+Upload a CSV file containing multiple race-condition scenarios.
+The app will generate a Pit / No Pit prediction and pit-stop probability for each row.
 """)
 
+    uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 
+    required_input_columns = [
+        "Stint",
+        "TyreLife",
+        "Position",
+        "LapTime (s)",
+        "LapTime_Delta",
+        "Cumulative_Degradation",
+        "RaceProgress",
+        "Normalized_TyreLife",
+        "Position_Change",
+        "Compound"
+    ]
+
+    if uploaded_file is not None:
+        try:
+            batch_df = pd.read_csv(
+                uploaded_file,
+                engine="python",
+                on_bad_lines="skip"
+            )
+
+            batch_df.columns = batch_df.columns.str.strip()
+
+            st.subheader("Uploaded Data Preview")
+            st.dataframe(batch_df.head(), use_container_width=True)
+
+            if "PitNextLap" in batch_df.columns:
+                batch_df = batch_df.drop(columns=["PitNextLap"])
+
+            missing_columns = [
+                col for col in required_input_columns
+                if col not in batch_df.columns
+            ]
+
+            if missing_columns:
+                st.error("The uploaded CSV is missing required columns:")
+                st.write(missing_columns)
+
+            else:
+                with st.spinner("Generating batch predictions..."):
+                    rf_model, model_columns = train_model()
+
+                    prepared_batch = prepare_input(
+                        batch_df[required_input_columns],
+                        model_columns
+                    )
+
+                    batch_predictions = rf_model.predict(prepared_batch)
+                    batch_probabilities = rf_model.predict_proba(prepared_batch)[:, 1]
+
+                result_df = batch_df.copy()
+                result_df["Pit_Stop_Prediction"] = batch_predictions
+                result_df["Prediction_Label"] = result_df["Pit_Stop_Prediction"].map({
+                    0: "No Pit Stop",
+                    1: "Pit Stop"
+                })
+                result_df["Pit_Stop_Probability"] = batch_probabilities
+
+                st.success("Batch prediction completed successfully.")
+                st.dataframe(result_df, use_container_width=True)
+
+                csv = result_df.to_csv(index=False).encode("utf-8")
+
+                st.download_button(
+                    label="Download Prediction Results",
+                    data=csv,
+                    file_name="f1_pitstop_batch_predictions.csv",
+                    mime="text/csv"
+                )
+
+        except Exception as e:
+            st.error("Batch prediction failed. Please check the uploaded CSV format.")
+            st.exception(e)
 # ======================================================
 # TAB 3: About model
 # ======================================================
