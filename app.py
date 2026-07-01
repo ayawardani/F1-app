@@ -12,13 +12,19 @@ st.set_page_config(
 )
 
 # -----------------------------
-# Train model from CSV on Cloud
+# Train model from CSV
 # -----------------------------
 @st.cache_resource
 def train_model():
     data_path = "f1_strategy_dataset_v4.csv"
 
-    df = pd.read_csv(data_path)
+    df = pd.read_csv(
+        data_path,
+        engine="python",
+        on_bad_lines="skip"
+    )
+
+    df.columns = df.columns.str.strip()
 
     feature_columns = [
         "Stint",
@@ -58,7 +64,7 @@ def train_model():
 
 
 # -----------------------------
-# Helper function
+# Preprocess input
 # -----------------------------
 def prepare_input(input_df, model_columns):
     input_df = input_df.copy()
@@ -88,7 +94,7 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 # ======================================================
-# TAB 1
+# TAB 1: Single prediction
 # ======================================================
 with tab1:
     st.header("Single Race Situation Prediction")
@@ -166,15 +172,19 @@ with tab1:
 
 
 # ======================================================
-# TAB 2
+# TAB 2: Batch CSV prediction
 # ======================================================
 with tab2:
     st.header("Batch CSV Prediction")
-    st.info("The deployed version focuses on single race-situation prediction.")
+
+    st.info("""
+The deployed version focuses on single race-situation prediction.
+Batch CSV prediction can be added as a future extension.
+""")
 
 
 # ======================================================
-# TAB 3
+# TAB 3: About model
 # ======================================================
 with tab3:
     st.header("About the Model")
@@ -207,7 +217,8 @@ Random Forest Classifier
 - Position_Change
 - Compound
 
-### Cloud Deployment Note
-For Streamlit Cloud, the model is trained directly from the dataset file included in the GitHub repository.  
-This avoids compatibility issues when loading a locally saved `.pkl` model file.
+### How the Cloud Version Works
+For Streamlit Cloud, the app trains the Random Forest model directly from the dataset file included in the GitHub repository.
+
+This avoids the cloud compatibility issue that occurred when loading the locally saved `.pkl` model file.
 """)
