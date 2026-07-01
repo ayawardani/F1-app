@@ -1,8 +1,7 @@
-st.write("App started successfully")
 import streamlit as st
 import pandas as pd
 import joblib
-
+st.write("App started successfully")
 # -----------------------------
 # Page setup
 # -----------------------------
