@@ -1,7 +1,14 @@
 import streamlit as st
 import pandas as pd
 import joblib
-st.write("App started successfully")
+
+# Load model and columns
+# -----------------------------
+@st.cache_resource
+def load_model():
+    rf_model = joblib.load("model/pitstop_model.pkl")
+    model_columns = joblib.load("model/model_columns.pkl")
+    return rf_model, model_columns
 # -----------------------------
 # Page setup
 # -----------------------------
@@ -12,12 +19,6 @@ st.set_page_config(
 )
 
 # -----------------------------
-# Load model and columns
-# -----------------------------
-st.success("Streamlit app is loading successfully.")
-
-rf_model = None
-model_columns = None
 
 # -----------------------------
 # App title
@@ -104,6 +105,8 @@ with tab1:
     st.dataframe(input_df, use_container_width=True)
 
     if st.button("Predict Pit Stop"):
+    with st.spinner("Loading model and generating prediction..."):
+        rf_model, model_columns = load_model()
         prepared_input = prepare_input(input_df)
 
         prediction = rf_model.predict(prepared_input)[0]
