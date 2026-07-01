@@ -2,22 +2,6 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-# Load model and columns
-# -----------------------------
-@st.cache_resource
-def load_model():
-    model_path = "model/pitstop_model.pkl"
-    columns_path = "model/model_columns.pkl"
-
-    rf_model = joblib.load(model_path)
-
-    # Important for Streamlit Cloud: avoid heavy parallel processing
-    if hasattr(rf_model, "n_jobs"):
-        rf_model.n_jobs = 1
-
-    model_columns = joblib.load(columns_path)
-
-    return rf_model, model_columns
 # -----------------------------
 # Page setup
 # -----------------------------
@@ -28,17 +12,23 @@ st.set_page_config(
 )
 
 # -----------------------------
-
+# Load model and columns
 # -----------------------------
-# App title
-# -----------------------------
-st.title("🏎️ Formula 1 Pit Stop Prediction App")
+@st.cache_resource
+def load_model():
+    model_path = "model/pitstop_model.pkl"
+    columns_path = "model/model_columns.pkl"
 
-st.markdown("""
-This app predicts whether a Formula 1 driver is likely to **pit on the next lap**
-based on race strategy variables such as tyre life, position, lap time, degradation,
-race progress, and tyre compound.
-""")
+    rf_model = joblib.load(model_path)
+
+    # Safer for Streamlit Cloud
+    if hasattr(rf_model, "n_jobs"):
+        rf_model.n_jobs = 1
+
+    model_columns = joblib.load(columns_path)
+
+    return rf_model, model_columns
+
 
 # -----------------------------
 # Helper function for preprocessing
@@ -59,6 +49,18 @@ def prepare_input(input_df, model_columns):
 
     return input_encoded
 
+
+# -----------------------------
+# App title
+# -----------------------------
+st.title("🏎️ Formula 1 Pit Stop Prediction App")
+
+st.markdown("""
+This app predicts whether a Formula 1 driver is likely to **pit on the next lap**
+based on race strategy variables such as tyre life, position, lap time, degradation,
+race progress, and tyre compound.
+""")
+
 # -----------------------------
 # Tabs
 # -----------------------------
@@ -73,7 +75,6 @@ tab1, tab2, tab3 = st.tabs([
 # ======================================================
 with tab1:
     st.header("Single Race Situation Prediction")
-
     st.write("Enter the current race situation below.")
 
     col1, col2, col3 = st.columns(3)
@@ -117,77 +118,66 @@ with tab1:
     })
 
     st.subheader("Input Data")
-    st.dataframe(input_df, use_container_width=True)
+    st.dataframe(input_df, width="stretch")
 
-if st.button("Predict Pit Stop"):
-    try:
-        with st.spinner("Generating prediction..."):
-            rf_model, model_columns = load_model()
-            prepared_input = prepare_input(input_df, model_columns)
+    if st.button("Predict Pit Stop"):
+        try:
+            with st.spinner("Generating prediction..."):
+                rf_model, model_columns = load_model()
+                prepared_input = prepare_input(input_df, model_columns)
 
-            prediction = rf_model.predict(prepared_input)[0]
+                prediction = rf_model.predict(prepared_input)[0]
 
-        st.subheader("Prediction Result")
+                # Try probability only if available
+                prediction_probability = None
+                if hasattr(rf_model, "predict_proba"):
+                    prediction_probability = rf_model.predict_proba(prepared_input)[0][1]
 
-        if prediction == 1:
-            st.error("Prediction: The driver is likely to PIT on the next lap.")
-        else:
-            st.success("Prediction: The driver is likely NOT to pit on the next lap.")
+            st.subheader("Prediction Result")
 
-    except Exception as e:
-        st.error("Prediction failed.")
-        st.exception(e)
+            if prediction == 1:
+                st.error("Prediction: The driver is likely to PIT on the next lap.")
+            else:
+                st.success("Prediction: The driver is likely NOT to pit on the next lap.")
+
+            if prediction_probability is not None:
+                st.metric(
+                    label="Pit Stop Probability",
+                    value=f"{prediction_probability * 100:.2f}%"
+                )
+                st.progress(float(prediction_probability))
+
+        except Exception as e:
+            st.error("Prediction failed.")
+            st.exception(e)
+
+
 # ======================================================
 # TAB 2: Batch CSV prediction
 # ======================================================
 with tab2:
-    st.header("Batch Prediction Using CSV Upload")
+    st.header("Batch CSV Prediction")
 
-    st.markdown("""
-Upload a CSV file with the same input columns used by the model.
-The file should include the race strategy features, but it should not include the target column `PitNextLap`.
+    st.info("""
+Batch CSV prediction is prepared as a future extension. 
+The current stable deployed version focuses on manual single prediction.
 """)
 
-    uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
+    st.markdown("""
+For batch prediction, the uploaded CSV must follow the exact same input structure used by the model, including:
 
-    if uploaded_file is not None:
-        batch_df = pd.read_csv(uploaded_file)
+- Stint
+- TyreLife
+- Position
+- LapTime (s)
+- LapTime_Delta
+- Cumulative_Degradation
+- RaceProgress
+- Normalized_TyreLife
+- Position_Change
+- Compound
+""")
 
-        st.subheader("Uploaded Data Preview")
-        st.dataframe(batch_df.head(), use_container_width=True)
-
-        if "PitNextLap" in batch_df.columns:
-            batch_df = batch_df.drop(columns=["PitNextLap"])
-
-        try:
-            prepared_batch = prepare_input(batch_df)
-
-            batch_predictions = rf_model.predict(prepared_batch)
-            batch_probabilities = rf_model.predict_proba(prepared_batch)[:, 1]
-
-            result_df = batch_df.copy()
-            result_df["Pit_Stop_Prediction"] = batch_predictions
-            result_df["Prediction_Label"] = result_df["Pit_Stop_Prediction"].map({
-                0: "No Pit Stop",
-                1: "Pit Stop"
-            })
-            result_df["Pit_Stop_Probability"] = batch_probabilities
-
-            st.success("Batch prediction completed successfully.")
-            st.dataframe(result_df, use_container_width=True)
-
-            csv = result_df.to_csv(index=False).encode("utf-8")
-
-            st.download_button(
-                label="Download Prediction Results",
-                data=csv,
-                file_name="f1_pitstop_predictions.csv",
-                mime="text/csv"
-            )
-
-        except Exception as e:
-            st.error("Prediction failed. Please check that the uploaded CSV columns match the model input features.")
-            st.exception(e)
 
 # ======================================================
 # TAB 3: About model
@@ -224,14 +214,8 @@ Random Forest Classifier
 - Compound
 
 ### How the App Works
-The app loads the trained Random Forest model from:
+The app collects race-condition inputs, applies the same preprocessing logic used during training, 
+and sends the prepared input to the selected Random Forest model.
 
-`model/pitstop_model.pkl`
-
-It also loads the original training columns from:
-
-`model/model_columns.pkl`
-
-This is necessary because the `Compound` column was one-hot encoded during training.
-The app applies the same encoding before making predictions.
+The output is a **Pit / No Pit prediction** and, when available, the **pit stop probability**.
 """)
