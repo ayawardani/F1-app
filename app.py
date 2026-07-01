@@ -125,8 +125,7 @@ if st.button("Predict Pit Stop"):
             rf_model, model_columns = load_model()
             prepared_input = prepare_input(input_df, model_columns)
 
-
-            prediction_probability = rf_model.predict_proba(prepared_input)[0][1]
+            prediction = rf_model.predict(prepared_input)[0]
 
         st.subheader("Prediction Result")
 
@@ -135,17 +134,9 @@ if st.button("Predict Pit Stop"):
         else:
             st.success("Prediction: The driver is likely NOT to pit on the next lap.")
 
-        st.metric(
-            label="Pit Stop Probability",
-            value=f"{prediction_probability * 100:.2f}%"
-        )
-
-        st.progress(float(prediction_probability))
-
     except Exception as e:
         st.error("Prediction failed.")
         st.exception(e)
-
 # ======================================================
 # TAB 2: Batch CSV prediction
 # ======================================================
