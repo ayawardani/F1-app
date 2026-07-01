@@ -125,7 +125,7 @@ if st.button("Predict Pit Stop"):
             rf_model, model_columns = load_model()
             prepared_input = prepare_input(input_df, model_columns)
 
-            prediction = rf_model.predict(prepared_input)[0]
+
             prediction_probability = rf_model.predict_proba(prepared_input)[0][1]
 
         st.subheader("Prediction Result")
