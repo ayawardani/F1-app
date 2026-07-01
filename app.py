@@ -104,7 +104,7 @@ with tab1:
     st.subheader("Input Data")
     st.dataframe(input_df, use_container_width=True)
 
-    if st.button("Predict Pit Stop"):
+if st.button("Predict Pit Stop"):
     with st.spinner("Loading model and generating prediction..."):
         rf_model, model_columns = load_model()
         prepared_input = prepare_input(input_df)
@@ -112,17 +112,17 @@ with tab1:
         prediction = rf_model.predict(prepared_input)[0]
         prediction_probability = rf_model.predict_proba(prepared_input)[0][1]
 
-        st.subheader("Prediction Result")
+    st.subheader("Prediction Result")
 
-        if prediction == 1:
-            st.error("Prediction: The driver is likely to PIT on the next lap.")
-        else:
-            st.success("Prediction: The driver is likely NOT to pit on the next lap.")
+    if prediction == 1:
+        st.error("Prediction: The driver is likely to PIT on the next lap.")
+    else:
+        st.success("Prediction: The driver is likely NOT to pit on the next lap.")
 
-        st.metric(
-            label="Pit Stop Probability",
-            value=f"{prediction_probability * 100:.2f}%"
-        )
+    st.metric(
+        label="Pit Stop Probability",
+        value=f"{prediction_probability * 100:.2f}%"
+    )
 
 # ======================================================
 # TAB 2: Batch CSV prediction
