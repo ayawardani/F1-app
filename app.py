@@ -1,3 +1,4 @@
+st.write("App started successfully")
 import streamlit as st
 import pandas as pd
 import joblib
@@ -14,13 +15,10 @@ st.set_page_config(
 # -----------------------------
 # Load model and columns
 # -----------------------------
-@st.cache_resource
-def load_model():
-    rf_model = joblib.load("model/pitstop_model.pkl")
-    model_columns = joblib.load("model/model_columns.pkl")
-    return rf_model, model_columns
+st.success("Streamlit app is loading successfully.")
 
-rf_model, model_columns = load_model()
+rf_model = None
+model_columns = None
 
 # -----------------------------
 # App title
