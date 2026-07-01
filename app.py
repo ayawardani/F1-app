@@ -16,7 +16,7 @@ st.set_page_config(
 # -----------------------------
 @st.cache_resource
 def train_model():
-    data_path = "f1_strategy_dataset_v4.csv"
+    data_path = "f1_strategy_db.csv"
 
     df = pd.read_csv(
         data_path,
