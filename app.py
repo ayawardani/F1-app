@@ -6,8 +6,17 @@ import joblib
 # -----------------------------
 @st.cache_resource
 def load_model():
-    rf_model = joblib.load("model/pitstop_model.pkl")
-    model_columns = joblib.load("model/model_columns.pkl")
+    model_path = "model/pitstop_model.pkl"
+    columns_path = "model/model_columns.pkl"
+
+    rf_model = joblib.load(model_path)
+
+    # Important for Streamlit Cloud: avoid heavy parallel processing
+    if hasattr(rf_model, "n_jobs"):
+        rf_model.n_jobs = 1
+
+    model_columns = joblib.load(columns_path)
+
     return rf_model, model_columns
 # -----------------------------
 # Page setup
@@ -34,14 +43,20 @@ race progress, and tyre compound.
 # -----------------------------
 # Helper function for preprocessing
 # -----------------------------
-def prepare_input(input_df):
-    """
-    Apply the same preprocessing used in the notebook:
-    1. One-hot encode Compound
-    2. Align columns with training columns
-    """
-    input_encoded = pd.get_dummies(input_df, columns=["Compound"], drop_first=True)
+def prepare_input(input_df, model_columns):
+    input_df = input_df.copy()
+    input_df.columns = input_df.columns.str.strip()
+
+    if "PitNextLap" in input_df.columns:
+        input_df = input_df.drop(columns=["PitNextLap"])
+
+    if "Compound" in input_df.columns:
+        input_encoded = pd.get_dummies(input_df, columns=["Compound"], drop_first=True)
+    else:
+        input_encoded = input_df.copy()
+
     input_encoded = input_encoded.reindex(columns=model_columns, fill_value=0)
+
     return input_encoded
 
 # -----------------------------
@@ -105,24 +120,31 @@ with tab1:
     st.dataframe(input_df, use_container_width=True)
 
 if st.button("Predict Pit Stop"):
-    with st.spinner("Loading model and generating prediction..."):
-        rf_model, model_columns = load_model()
-        prepared_input = prepare_input(input_df)
+    try:
+        with st.spinner("Generating prediction..."):
+            rf_model, model_columns = load_model()
+            prepared_input = prepare_input(input_df, model_columns)
 
-        prediction = rf_model.predict(prepared_input)[0]
-        prediction_probability = rf_model.predict_proba(prepared_input)[0][1]
+            prediction = rf_model.predict(prepared_input)[0]
+            prediction_probability = rf_model.predict_proba(prepared_input)[0][1]
 
-    st.subheader("Prediction Result")
+        st.subheader("Prediction Result")
 
-    if prediction == 1:
-        st.error("Prediction: The driver is likely to PIT on the next lap.")
-    else:
-        st.success("Prediction: The driver is likely NOT to pit on the next lap.")
+        if prediction == 1:
+            st.error("Prediction: The driver is likely to PIT on the next lap.")
+        else:
+            st.success("Prediction: The driver is likely NOT to pit on the next lap.")
 
-    st.metric(
-        label="Pit Stop Probability",
-        value=f"{prediction_probability * 100:.2f}%"
-    )
+        st.metric(
+            label="Pit Stop Probability",
+            value=f"{prediction_probability * 100:.2f}%"
+        )
+
+        st.progress(float(prediction_probability))
+
+    except Exception as e:
+        st.error("Prediction failed.")
+        st.exception(e)
 
 # ======================================================
 # TAB 2: Batch CSV prediction
